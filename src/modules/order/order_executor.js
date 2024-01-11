@@ -235,7 +235,8 @@ module.exports = class OrderExecutor {
     const exchange = this.exchangeManager.get(exchangeName);
     if (!exchange) {
       console.error(`CancelOrder: Invalid exchange: ${exchangeName}`);
-      return undefined;
+      this.logger.error(`Failed to cancel order: ${orderId}`);
+this.logger.error(err);
     }
 
     try {
@@ -246,7 +247,8 @@ module.exports = class OrderExecutor {
       this.logger.error(`Order cancel error: ${orderId} ${err}`);
     }
 
-    return undefined;
+    this.logger.error(`Failed to cancel order: ${orderId}`);
+this.logger.error(err);
   }
 
   async cancelAll(exchangeName, symbol) {
