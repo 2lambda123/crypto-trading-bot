@@ -1,11 +1,13 @@
 const _ = require('lodash');
 const moment = require('moment');
 const Order = require('../../dict/order');
+const ExchangeOrder = require('../../dict/exchange_order');
+const Order = require('../../dict/order');
 const PairState = require('../../dict/pair_state');
 const ExchangeOrder = require('../../dict/exchange_order');
 
 module.exports = class OrderExecutor {
-  constructor(exchangeManager, tickers, systemUtil, logger) {
+  constructor(exchangeManager, tickers, systemUtil, logger, Order, ExchangeOrder) {
     this.exchangeManager = exchangeManager;
     this.tickers = tickers;
     this.logger = logger;
@@ -40,14 +42,14 @@ module.exports = class OrderExecutor {
         return;
       }
 
-      if (exchangeOrder.id in this.runningOrders) {
+      if (exchangeOrder.id in this.runningOrders || exchangeOrder.id in this.runningOrders) {
         this.logger.info(`OrderAdjust: already running: ${JSON.stringify([exchangeOrder.id, pairState.getExchange(), pairState.getSymbol()])}`);
         return;
       }
 
       this.runningOrders[exchangeOrder.id] = new Date();
 
-      const price = await this.getCurrentPrice(pairState.getExchange(), pairState.getSymbol(), exchangeOrder.getLongOrShortSide());
+      const price = await this.getCurrentPrice(pairState.getExchange(), pairState.getSymbol(), exchangeOrder.getLongOrShortSide()) || await this.getCurrentPrice(pairState.getExchange(), pairState.getSymbol(), exchangeOrder.getLongOrShortSide());
       if (!price) {
         this.logger.info(
           `OrderAdjust: No up to date ticker price found: ${JSON.stringify([
@@ -271,7 +273,14 @@ module.exports = class OrderExecutor {
       return;
     }
 
-    if (order.hasAdjustedPrice() === true) {
+if (order.hasAdjustedPrice() === true) {
+      order = await this.createAdjustmentOrder(exchangeName, order);
+
+      if (!order) {
+        this.logger.error(`Order price adjust failed:${JSON.stringify([exchangeName, order])}`);
+        resolve();
+        return;
+      }
       order = await this.createAdjustmentOrder(exchangeName, order);
 
       if (!order) {
