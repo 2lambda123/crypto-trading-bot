@@ -1,7 +1,8 @@
 const _ = require('lodash');
 const moment = require('moment');
 const Order = require('../../dict/order');
-const ExchangeOrder = require('../../dict/exchange_order');
+const ExchangeManager = require('../../modules/exchange/exchange_manager');
+const ExchangePosition = require('../../dict/exchange_position');
 const Order = require('../../dict/order');
 const PairState = require('../../dict/pair_state');
 const ExchangeOrder = require('../../dict/exchange_order');
@@ -12,6 +13,7 @@ module.exports = class OrderExecutor {
     this.tickers = tickers;
     this.logger = logger;
     this.systemUtil = systemUtil;
+    this.exchangeManager = new ExchangeManager();
     this.runningOrders = {};
 
     this.tickerPriceInterval = 200;
@@ -215,7 +217,12 @@ module.exports = class OrderExecutor {
       order.price = parseFloat(price);
     }
 
-    return this.executeOrder(exchangeName, order);
+    return new Promise((resolve, reject) => {
+      this.triggerOrder(resolve, exchangeName, order).catch(error => {
+        this.logger.error(`executeOrderWithAmountAndPrice: Order execution failed: ${JSON.stringify([exchangeName, order, error])}`);
+        reject(error);
+      });
+    });
   }
 
   executeOrder(exchangeName, order) {
