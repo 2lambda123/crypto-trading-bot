@@ -99,7 +99,48 @@ module.exports = class OrderExecutor {
       }
 
       try {
-        const updatedOrder = await exchange.updateOrder(orderUpdate.id, orderUpdate);
+        try {
+  const updatedOrder = await exchange.updateOrder(orderUpdate.id, orderUpdate);
+  
+  if (updatedOrder && updatedOrder.status === ExchangeOrder.STATUS_OPEN) {
+    this.logger.info(
+      `OrderAdjust: Order adjusted with orderbook price: ${JSON.stringify([
+        updatedOrder.id,
+        Math.abs(lastExchangeOrder.price),
+        Math.abs(price),
+        pairState.getExchange(),
+        pairState.getSymbol(),
+        updatedOrder])}`
+    );
+    pairState.setExchangeOrder(updatedOrder);
+  } else if (updatedOrder && updatedOrder.status === ExchangeOrder.STATUS_CANCELED && updatedOrder.retry === true) {
+     // we update the price outside the orderbook price range on PostOnly we will cancel the order directly
+    this.logger.error(`OrderAdjust: Updated order canceled recreate: ${JSON.stringify([pairState, updatedOrder])}`);
+
+    // recreate order
+    // @TODO: resync used balance in case on order is partially filled
+
+    const amount =
+      lastExchangeOrder.getLongOrShortSide() === ExchangeOrder.SIDE_LONG
+        ? Math.abs(lastExchangeOrder.amount)
+        : Math.abs(lastExchangeOrder.amount) * -1;
+
+    // create a retry order with the order amount we had before; eg if partially filled
+    const retryOrder =
+      pairState.getState() === PairState.STATE_CLOSE
+        ? Order.createCloseOrderWithPriceAdjustment(pairState.getSymbol(), amount)
+        : Order.createLimitPostOnlyOrderAutoAdjustedPriceOrder(pairState.getSymbol(), amount);
+
+    this.logger.error(`OrderAdjust: replacing canceled order: ${JSON.stringify(retryOrder)}`);
+
+    const exchangeOrder = await this.executeOrder(pairState.getOrder(), retryOrder);
+    pairState.setExchangeOrder(exchangeOrder);
+ } else {
+    this.logger.error(`OrderAdjust: Unknown order state: ${JSON.stringify([pairState, updatedOrder])}`);
+ }
+} catch (err) {
+      this.logger.error(`OrderAdjust: adjusted failed: ${JSON.stringify([String(err), pairState, orderUpdate])}`);
+}
 
         if (updatedOrder && updatedOrder.status === ExchangeOrder.STATUS_OPEN) {
           this.logger.info(
