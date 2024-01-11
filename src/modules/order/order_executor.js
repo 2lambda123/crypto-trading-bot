@@ -2,6 +2,8 @@ const _ = require('lodash');
 const moment = require('moment');
 const Order = require('../../dict/order');
 const ExchangeManager = require('../../modules/exchange/exchange_manager');
+const ExchangeManager = require('../../modules/exchange/exchange_manager');
+const ExchangeManager = require('../../modules/exchange/exchange_manager');
 const ExchangePosition = require('../../dict/exchange_position');
 const Order = require('../../dict/order');
 const PairState = require('../../dict/pair_state');
@@ -275,14 +277,21 @@ this.logger.error(err);
     }
 
     const exchange = this.exchangeManager.get(exchangeName);
-    if (!exchange) {
-      console.error(`triggerOrder: Invalid exchange: ${exchangeName}`);
+if (!exchange) {
+  this.logger.error(`triggerOrder: Invalid exchange: ${exchangeName}`);
 
-      resolve();
-      return;
-    }
+  resolve();
+  return;
+}
 
 if (order.hasAdjustedPrice() === true) {
+      order = await this.createAdjustmentOrder(exchangeName, order);
+
+      if (!order) {
+        this.logger.error(`Order price adjust failed:${JSON.stringify([exchangeName, order])}`);
+        resolve();
+        return;
+      }
       order = await this.createAdjustmentOrder(exchangeName, order);
 
       if (!order) {
